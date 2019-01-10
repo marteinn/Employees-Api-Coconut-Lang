@@ -1,6 +1,6 @@
 # Employees-Api-Coconut-Lang
 
-This is a example repo that showcases how bottle based api using peewee can look like when built in coconut lang.
+A example api built in coconut using peewee and bottle. The repo showcases how to use composition, partial application, pipelines, data, algebraic data types and pattern matching.
 
 ## Getting started
 
