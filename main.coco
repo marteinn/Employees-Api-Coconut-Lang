@@ -1,0 +1,94 @@
+"""
+Installation:
+    pip install coconut
+    pip install bottle
+    pip install peewee
+
+Running:
+    coconut test.coco && python test.py
+"""
+
+from bottle import route, run, template, response, request
+import peewee
+from peewee import Model, CharField, SqliteDatabase
+from playhouse.shortcuts import model_to_dict, dict_to_model
+
+
+# Models
+db = SqliteDatabase('employees.db')
+
+class BaseModel(Model):
+    class Meta:
+        database = db
+
+
+class Employee(BaseModel):
+    email = CharField(unique=True)
+    company = CharField()
+
+
+# Helpers
+def response_data(body) = {"data": body}
+def set_status(status, body): response.status = status; return body
+def spy(x): print(x); return x
+
+response_ok = set_status$(200) ..> response_data
+response_error = set_status$(500) ..> response_data
+response_created = set_status$(201) ..> response_data
+response_not_found = set_status$(404) ..> spy ..> response_data
+
+class Either
+data Right(x) from Either
+data Left(err) from Either
+
+def make_either(fn):
+    try:
+        return Right(fn())
+    except Exception as err:
+        return Left(err)
+
+
+# Handlers
+@route('/employees')
+def index():
+    return response_ok <| employees where:
+        employees = (Employee.select() |> map$(model_to_dict) |> list)
+
+
+@route('/employees/<email>')
+def detail(email):
+    matches = Employee.select() |> .where(Employee.email == email) |> map$(model_to_dict) |> list
+    case matches:
+        match [employee]: return response_ok <| employee
+        match _: return response_not_found <| "Employee not found"
+
+
+@route('/employees/<email>', method='DELETE')
+def delete(email):
+    status = Employee.delete() |> .where(Employee.email == email) |> .execute()
+    case status:
+        match 1: return response_ok <| "deleted"
+        match _: return response_not_found <| "employee not found"
+
+
+@route('/employees', method='POST')
+def create():
+    either = make_either$ <| (-> Employee.create(**request.forms).save())
+    case either():
+        match Right(_x): return response_created <| "created"
+        match Left(_err): return response_not_found <| "employee already exists"
+
+
+@route('/create-local-db')
+def create_local_db():
+    db.create_tables <| [Employee]
+    return response_ok <| "database was created"
+
+
+# Setup
+def init_app() = (
+    db |> .connect(),
+    run(host='localhost', port=8080),
+)
+
+init_app()
